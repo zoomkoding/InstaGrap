@@ -12,21 +12,34 @@ void child_proc(int conn){
 	char * data = 0x0, * orig = 0x0 ;
 	int len = 0 ;
 	int s ;
+    int file_size;
+	FILE *received_file;
+	int remain_data = 0;
 
-	while ( (s = recv(conn, buf, 1023, 0)) > 0 ) {
-		buf[s] = 0x0 ;
-		if (data == 0x0) {
-			data = strdup(buf) ;
-			len = s ;
-		}
-		else {
-			data = realloc(data, len + s + 1) ;
-			strncpy(data + len, buf, s) ;
-			data[len + s] = 0x0 ;
-			len += s ;
-		}
+    /* Receiving file size */
+	recv(conn, buf, 1023, 0);
+	file_size = atoi(buf);
+	//fprintf(stdout, "\nFile size : %d\n", file_size);
 
+	received_file = fopen("./hello.c", "w");
+	if (received_file == NULL)
+	{
+			fprintf(stderr, "Failed to open file \"./hello.c\"\n");
+
+			exit(EXIT_FAILURE);
 	}
+
+	remain_data = file_size;
+
+	while ((remain_data > 0) && ((len = recv(conn, buf, 1023, 0)) > 0))
+	{
+			fwrite(buf, sizeof(char), len, received_file);
+			remain_data -= len;
+			fprintf(stdout, "Receive %d bytes and we hope :- %d bytes\n", len, remain_data);
+	}
+    
+	fclose(received_file);
+
 	printf("worker> %s\n", data) ;
 
 	orig = data ;
@@ -56,7 +69,7 @@ main(int argc, char const *argv[])
 
 	else {
 		printf("Please give a right command with an available port number.\n");
-		printf("usage : ./worker -p [port_num]\n");
+		printf("usage : ./instagrapd -p [port_num] -w <IP>:<WPort> <Dir>\n");
 		return 0;
 	}
 
