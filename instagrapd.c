@@ -21,7 +21,7 @@ void child_proc(int conn){
 	file_size = atoi(buf);
 	//fprintf(stdout, "\nFile size : %d\n", file_size);
 
-	received_file = fopen("./hello.c", "w");
+	received_file = fopen("./hello_from_instagrapd.c", "w");
 	if (received_file == NULL)
 	{
 			fprintf(stderr, "Failed to open file \"./hello.c\"\n");
@@ -40,7 +40,7 @@ void child_proc(int conn){
     
 	fclose(received_file);
 
-	printf("worker> %s\n", data) ;
+	printf("instagrapd> file created\n") ;
 
 	orig = data ;
 	while (len > 0 && (s = send(conn, data, len, 0)) > 0) {

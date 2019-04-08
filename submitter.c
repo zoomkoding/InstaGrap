@@ -65,16 +65,16 @@ main(int argc, char const *argv[])
 
     fprintf(stdout, "File Size: \n%d bytes\n", file_stat.st_size);
 
-    fprintf(stdout, "Server sent %d bytes for the size\n", len);
+    fprintf(stdout, "Submitter sent %d bytes for the size\n", len);
 
     offset = 0;
     remain_data = file_stat.st_size;
     /* Sending file data */
      while (((sent_bytes = sendfile(sock_fd, fd, &offset, BUFSIZ)) > 0) && (remain_data > 0))
     {
-            fprintf(stdout, "1. Server sent %d bytes from file's data, offset is now : %d and remaining data = %d\n", sent_bytes, offset, remain_data);
+            fprintf(stdout, "1. Submitter sent %d bytes from file's data, offset is now : %d and remaining data = %d\n", sent_bytes, offset, remain_data);
             remain_data -= sent_bytes;
-            fprintf(stdout, "2. Server sent %d bytes from file's data, offset is now : %d and remaining data = %d\n", sent_bytes, offset, remain_data);
+            fprintf(stdout, "2. Submitter sent %d bytes from file's data, offset is now : %d and remaining data = %d\n", sent_bytes, offset, remain_data);
     }
 
 
