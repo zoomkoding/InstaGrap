@@ -6,39 +6,60 @@
 #include <stdlib.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+#define LENGTH 512
 
 void child_proc(int conn){
 	char buf[1024] ;
 	char * data = 0x0, * orig = 0x0 ;
 	int len = 0 ;
 	int s ;
-    int file_size;
+  int file_size;
 	FILE *received_file;
 	int remain_data = 0;
 
-    /* Receiving file size */
-	recv(conn, buf, 1023, 0);
-	file_size = atoi(buf);
-	//fprintf(stdout, "\nFile size : %d\n", file_size);
-
-	received_file = fopen("./hello_from_instagrapd.c", "w");
-	if (received_file == NULL)
+	/*Receive File from Client */
+	char* fr_name = "./21500670.c";
+	FILE *fr = fopen(fr_name, "a");
+	if(fr == NULL)
+		printf("File %s Cannot be opened file on server.\n", fr_name);
+	else
 	{
-			fprintf(stderr, "Failed to open file \"./hello.c\"\n");
-
-			exit(EXIT_FAILURE);
+		bzero(buf, LENGTH);
+		int fr_block_sz = 0;
+		while((fr_block_sz = recv(conn, buf, LENGTH, 0)) > 0)
+		{
+		  int write_sz = fwrite(buf, sizeof(char), fr_block_sz, fr);
+			if(write_sz < fr_block_sz)
+		    {
+		        error("File write failed on server.\n");
+		    }
+			bzero(buf, LENGTH);
+			if (fr_block_sz == 0 || fr_block_sz != 512)
+			{
+				break;
+			}
+		}
+		if(fr_block_sz < 0)
+	    {
+	        if (errno == EAGAIN)
+        	{
+                printf("recv() timed out.\n");
+            }
+            else
+            {
+                fprintf(stderr, "recv() failed due to errno = %d\n", errno);
+				exit(1);
+            }
+      	}
+		printf("Ok received from client!\n");
+		fclose(fr);
 	}
 
-	remain_data = file_size;
-
-	while ((remain_data > 0) && ((len = recv(conn, buf, 1023, 0)) > 0))
-	{
-			fwrite(buf, sizeof(char), len, received_file);
-			remain_data -= len;
-			fprintf(stdout, "Receive %d bytes and we hope :- %d bytes\n", len, remain_data);
-	}
-    
-	fclose(received_file);
 
 	printf("instagrapd> file created\n") ;
 
