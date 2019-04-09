@@ -43,7 +43,7 @@ main(int argc, char const *argv[])
 		exit(EXIT_FAILURE) ;
 	}
 
-	char* fs_name = "./hello.c";
+	char* fs_name = "./submit.c";
 	char sdbuf[LENGTH];
 	printf("[Client] Sending %s to the Server... ", fs_name);
 	FILE *fs = fopen(fs_name, "r");

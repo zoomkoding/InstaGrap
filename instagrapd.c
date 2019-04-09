@@ -13,6 +13,9 @@
 
 #define LENGTH 512
 
+int sock_fd ;
+
+
 void child_proc(int conn){
 	char buf[1024] ;
 	char * data = 0x0, * orig = 0x0 ;
@@ -62,23 +65,44 @@ void child_proc(int conn){
 	}
 
 
-	printf("instagrapd> file created\n") ;
-
-	//object? ????
-	pid_t child_pid ;
-	int exit_code ;
-
-	child_pid = fork() ;
+	pid_t child_pid = fork() ;
 	if (child_pid == 0) {
-    
 		execl("/usr/bin/gcc", "gcc", "-o", student_id, fr_name, (char *) NULL);
 	}
 	else {
 		wait(0);
-		freopen("testcase/1.in", "r", stdin);
-		freopen("1.out", "w", stdout);
-		execl(student_id, 0);
+		printf("instagrapd> exe file created\n");
+		data = student_id;
+		len = 8;
+		s = 0;
+		while (len > 0 && (s = send(sock_fd, data, len, 0)) > 0) {
+			data += s ;
+			len -= s ;
+		}
+		shutdown(sock_fd, SHUT_WR) ;
+
 	}
+
+
+	char buf1[1024] ;
+	data = 0x0 ;
+	len = 0 ;
+	while ( (s = recv(sock_fd, buf1, 1023, 0)) > 0 ) {
+		buf1[s] = 0x0 ;
+		if (data == 0x0) {
+			data = strdup(buf1) ;
+			len = s ;
+		}
+		else {
+			data = realloc(data, len + s + 1) ;
+			strncpy(data + len, buf1, s) ;
+			data[len + s] = 0x0 ;
+			len += s ;
+		}
+
+	}
+	printf("instagrapd> %s\n", data);
+
 }
 
 int
@@ -89,7 +113,6 @@ main(int argc, char const *argv[])
 	int opt = 1;
 	int addrlen = sizeof(address);
   	int port_num;
-	char buffer[1024] = {0};
 
 	if(strcmp(argv[1], "-p") == 0){
 		port_num = atoi(argv[2]);
@@ -115,6 +138,29 @@ main(int argc, char const *argv[])
 	if (bind(listen_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
 		perror("bind failed : ");
 		exit(EXIT_FAILURE);
+	}
+
+
+	struct sockaddr_in serv_addr;
+
+
+	sock_fd = socket(AF_INET, SOCK_STREAM, 0) ;
+	if (sock_fd <= 0) {
+		perror("socket failed : ") ;
+		exit(EXIT_FAILURE) ;
+	}
+
+	memset(&serv_addr, '0', sizeof(serv_addr));
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_port = htons(8080);
+	if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
+		perror("inet_pton failed : ") ;
+		exit(EXIT_FAILURE) ;
+	}
+
+	if (connect(sock_fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+		perror("connect failed : ") ;
+		exit(EXIT_FAILURE) ;
 	}
 
 	while (1) {

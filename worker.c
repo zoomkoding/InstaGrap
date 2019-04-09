@@ -27,16 +27,33 @@ void child_proc(int conn){
 		}
 
 	}
-	printf("worker> %s\n", data) ;
+	printf("worker> student_id received: %s\n", data) ;
 
-	orig = data ;
-	while (len > 0 && (s = send(conn, data, len, 0)) > 0) {
-		data += s ;
-		len -= s ;
-	}
+	// orig = data ;
+
 	shutdown(conn, SHUT_WR) ;
 	if (orig != 0x0)
 		free(orig) ;
+	pid_t child_pid ;
+	int exit_code ;
+	char *student_id = data;
+	child_pid = fork() ;
+	if (child_pid == 0) {
+		printf("worker> testcase test begins\n");
+		freopen("testcase/1.in", "r", stdin);
+		freopen("1.out", "w", stdout);
+		execl(student_id, 0);
+	}
+	else {
+		wait(0);
+		printf("worker> testcase test ends\n");
+		len = 20;
+		char *message1 = "testcase test over.\n";
+		while (len > 0 && (s = send(conn, message1, len, 0)) > 0) {
+			data += s ;
+			len -= s ;
+		}
+	}
 }
 
 int
