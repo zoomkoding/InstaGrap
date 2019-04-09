@@ -1,3 +1,4 @@
+all : submitter instagrapd worker
 submitter : submitter.c
 	gcc -o submitter submitter.c
 instagrapd : instagrapd.c
@@ -11,4 +12,3 @@ clean:
 	rm -f worker
 	rm -f 21500670*
 
-.PHONY: all clean test
