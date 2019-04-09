@@ -23,7 +23,8 @@ void child_proc(int conn){
 	int remain_data = 0;
 
 	/*Receive File from Client */
-	char* fr_name = "./21500670.c";
+	char* fr_name = "21500670.c";
+	char* student_id = "21500670";
 	FILE *fr = fopen(fr_name, "a");
 	if(fr == NULL)
 		printf("File %s Cannot be opened file on server.\n", fr_name);
@@ -63,14 +64,21 @@ void child_proc(int conn){
 
 	printf("instagrapd> file created\n") ;
 
-	orig = data ;
-	while (len > 0 && (s = send(conn, data, len, 0)) > 0) {
-		data += s ;
-		len -= s ;
+	//object? ????
+	pid_t child_pid ;
+	int exit_code ;
+
+	child_pid = fork() ;
+	if (child_pid == 0) {
+    
+		execl("/usr/bin/gcc", "gcc", "-o", student_id, fr_name, (char *) NULL);
 	}
-	shutdown(conn, SHUT_WR) ;
-	if (orig != 0x0)
-		free(orig) ;
+	else {
+		wait(0);
+		freopen("testcase/1.in", "r", stdin);
+		freopen("1.out", "w", stdout);
+		execl(student_id, 0);
+	}
 }
 
 int
