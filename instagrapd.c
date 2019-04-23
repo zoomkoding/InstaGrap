@@ -133,8 +133,9 @@ main(int argc, char const *argv[])
 				opt_ok ++;
                 break; 
             case 'u':
+			    memcpy(ip_port, optarg, 100);
 				char *token = NULL;
-				token = strtok( optarg, ":" );
+				token = strtok( ip_port, ":" );
 				int i = 0;
 				while( token != NULL )
 				{
