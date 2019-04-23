@@ -154,31 +154,49 @@ main(int argc, char const *argv[])
 		memcpy(dir, argv[index], 30);
 	}
 
-	if (opt_ok != 3)
-    { 
-        printf("Please give a right command with an available port number.\n");
-		printf("usage : ./instagrapd -p [port_num] -w <IP>:<WPort> <Dir>\n");
-		return 0;
-    } 
+//	if (opt_ok != 3)
+//    { 
+//		printf("Please give a right command with an available port number.\n");
+//		printf("usage : ./instagrapd -p [port_num] -w <IP>:<WPort> <Dir>\n");
+//		return 0;
+//    } 
 
 	listen_fd = socket(AF_INET /*IPv4*/, SOCK_STREAM /*TCP*/, 0 /*IP*/) ;
-	if (listen_fd == 0)  {
-		perror("socket failed : ");
-		exit(EXIT_FAILURE);
-	}
+        if (listen_fd == 0)  {
+                perror("socket failed : ");
+                exit(EXIT_FAILURE);
+        }
 
-	memset(&address, '0', sizeof(address));
-	address.sin_family = AF_INET;
-	address.sin_addr.s_addr = INADDR_ANY /* the localhost*/ ;
-	address.sin_port = htons(port);
-	if (bind(listen_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
-		perror("bind failed : ");
-		exit(EXIT_FAILURE);
-	}
-	if (connect(listen_fd, (struct sockaddr *) &address, sizeof(address)) < 0) {
-		perror("connect failed : ") ;
-		exit(EXIT_FAILURE) ;
-	}
+        memset(&address, '0', sizeof(address));
+        address.sin_family = AF_INET;
+        address.sin_addr.s_addr = INADDR_ANY /* the localhost*/ ;
+        address.sin_port = htons(port);
+        if (bind(listen_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+                perror("bind failed : ");
+                exit(EXIT_FAILURE);
+        }
+
+
+
+        while (1) {
+                if (listen(listen_fd, 16 /* the size of waiting queue*/) < 0) {
+                        perror("listen failed : ");
+                        exit(EXIT_FAILURE);
+                }
+
+                new_socket = accept(listen_fd, (struct sockaddr *) &address, (socklen_t*)&addrlen) ;
+                if (new_socket < 0) {
+                        perror("accept");
+                        exit(EXIT_FAILURE);
+                }
+
+                if (fork() > 0) {
+                        child_proc(new_socket) ;
+                }
+                else {
+                        close(new_socket) ;
+                }
+        }
 
 	// worker_fd = socket(AF_INET /*IPv4*/, SOCK_STREAM /*TCP*/, 0 /*IP*/) ;
 	// if (worker_fd == 0)  {
@@ -207,23 +225,4 @@ main(int argc, char const *argv[])
 	// 	exit(EXIT_FAILURE) ;
 	// }
 
-	while (1) {
-		if (listen(listen_fd, 16 /* the size of waiting queue*/) < 0) {
-			perror("listen failed : ");
-			exit(EXIT_FAILURE);
-		}
-
-		new_socket = accept(listen_fd, (struct sockaddr *) &address, (socklen_t*)&addrlen) ;
-		if (new_socket < 0) {
-			perror("accept");
-			exit(EXIT_FAILURE);
-		}
-
-		if (fork() > 0) {
-			child_proc(new_socket) ;
-		}
-		else {
-			close(new_socket) ;
-		}
-	}
 }
