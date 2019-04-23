@@ -28,7 +28,7 @@ main(int argc, char const *argv[])
 	int sock_fd ;
 	int s, len ;
 	char buffer[1024] = {0};
-	char data = 0x0;
+	char * data ;
 	char ip_port[100];
 	char id[10];
 	char ip[20];
@@ -43,8 +43,9 @@ main(int argc, char const *argv[])
         switch(opt) 
         { 
             case 'n':
+                memcpy(ip_port, optarg, 100);
 				char *token = NULL;
-				token = strtok( optarg, ":" );
+				token = strtok( ip_port, ":" );
 				int i = 0;
 				while( token != NULL )
 				{
@@ -143,14 +144,6 @@ main(int argc, char const *argv[])
 			exit(EXIT_FAILURE) ;
 		}
 		//물어볼 때 쓰는 질문을 만들어
-		data = id;
-		len = 8;
-		s = 0;
-		while (len > 0 && (s = send(sock_fd, data, len, 0)) > 0) {
-			data += s ;
-			len -= s ;
-		}
-		shutdown(sock_fd, SHUT_WR) ;
 
 		//아직이라고 하면 그냥 진행
 
