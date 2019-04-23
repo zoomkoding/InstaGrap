@@ -7,6 +7,8 @@
 #include <netinet/in.h>
 #include <string.h>
 
+#define PORT_WORKER 8018
+
 void child_proc(int conn){
 	char buf[1024] ;
 	char * data = 0x0, * orig = 0x0 ;
@@ -86,7 +88,7 @@ main(int argc, char const *argv[])
 	memset(&address, '0', sizeof(address));
 	address.sin_family = AF_INET;
 	address.sin_addr.s_addr = INADDR_ANY /* the localhost*/ ;
-	address.sin_port = htons(port_num);
+	address.sin_port = htons(PORT_WORKER);
 	if (bind(listen_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
 		perror("bind failed : ");
 		exit(EXIT_FAILURE);

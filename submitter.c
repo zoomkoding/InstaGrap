@@ -10,19 +10,76 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <sys/sendfile.h>
+// #include <sys/sendfile.h>
 
+#define PORT_USER 8017
 
 #define LENGTH 512
+
+void help(){
+	printf("no good\n");
+}
 
 int
 main(int argc, char const *argv[])
 {
 	struct sockaddr_in serv_addr;
+
 	int sock_fd ;
 	int s, len ;
 	char buffer[1024] = {0};
-	char * data ;
+	char data = 0x0;
+	char ip_port[100];
+	char id[10];
+	char ip[20];
+	int port;
+	char pw[8];
+	char filename[30];
+	 
+	int opt;
+	int opt_ok = 0;
+	while((opt = getopt(argc, argv, "n:u:k:")) != -1) 
+    {
+        switch(opt) 
+        { 
+            case 'n':
+				char *token = NULL;
+				token = strtok( optarg, ":" );
+				int i = 0;
+				while( token != NULL )
+				{
+					if(i == 0) memcpy(ip, token, 20);
+					else if(i == 1) port = atoi(token);
+					token = strtok( NULL, ":" );
+					i++;
+				}
+				opt_ok ++;
+                break; 
+            case 'u':
+                memcpy(id, optarg, 8);
+				opt_ok ++;
+                break;
+            case 'k':
+				memcpy(pw, optarg, 8);
+                opt_ok ++;
+                break;
+			
+        }
+    } 
+
+	for (int index = optind; index < argc; index++) {
+		opt_ok ++;
+		memcpy(filename, argv[index], 30);
+	}
+
+	printf("IP : %s, port : %d, id : %s, pw : %s filename : %s\n", ip, port, id, pw, filename);
+
+
+	if (opt_ok != 4)
+    { 
+        help();
+        exit(0);
+    } 
 
 	sock_fd = socket(AF_INET, SOCK_STREAM, 0) ;
 	if (sock_fd <= 0) {
@@ -32,8 +89,8 @@ main(int argc, char const *argv[])
 
 	memset(&serv_addr, '0', sizeof(serv_addr));
 	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_port = htons(8090);
-	if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
+	serv_addr.sin_port = htons(port);
+	if (inet_pton(AF_INET, ip, &serv_addr.sin_addr) <= 0) {
 		perror("inet_pton failed : ") ;
 		exit(EXIT_FAILURE) ;
 	}
@@ -43,13 +100,12 @@ main(int argc, char const *argv[])
 		exit(EXIT_FAILURE) ;
 	}
 
-	char* fs_name = "./submit.c";
 	char sdbuf[LENGTH];
-	printf("[Client] Sending %s to the Server... ", fs_name);
-	FILE *fs = fopen(fs_name, "r");
+	printf("[Client] Sending %s to the Server... ", filename);
+	FILE *fs = fopen(filename, "r");
 	if(fs == NULL)
 	{
-		printf("ERROR: File %s not found.\n", fs_name);
+		printf("ERROR: File %s not found.\n", filename);
 		exit(1);
 	}
 
@@ -59,32 +115,68 @@ main(int argc, char const *argv[])
 	{
 	    if(send(sock_fd, sdbuf, fs_block_sz, 0) < 0)
 	    {
-	        fprintf(stderr, "ERROR: Failed to send file %s. (errno = %d)\n", fs_name, errno);
+	        fprintf(stderr, "ERROR: Failed to send file %s. (errno = %d)\n", filename, errno);
 	        break;
 	    }
 	    bzero(sdbuf, LENGTH);
 	}
-	printf("Ok File %s from Client was Sent!\n", fs_name);
+	printf("Ok File %s from Client was Sent!\n", filename);
+	close(sock_fd);
 
-	shutdown(sock_fd, SHUT_WR) ;
+	while(1){
+		sock_fd = socket(AF_INET, SOCK_STREAM, 0) ;
+		if (sock_fd <= 0) {
+			perror("socket failed : ") ;
+			exit(EXIT_FAILURE) ;
+		}
 
-	// char buf[1024] ;
-	// data = 0x0 ;
-	// len = 0 ;
-	// while ( (s = recv(sock_fd, buf, 1023, 0)) > 0 ) {
-	// 	buf[s] = 0x0 ;
-	// 	if (data == 0x0) {
-	// 		data = strdup(buf) ;
-	// 		len = s ;
-	// 	}
-	// 	else {
-	// 		data = realloc(data, len + s + 1) ;
-	// 		strncpy(data + len, buf, s) ;
-	// 		data[len + s] = 0x0 ;
-	// 		len += s ;
-	// 	}
+		memset(&serv_addr, '0', sizeof(serv_addr));
+		serv_addr.sin_family = AF_INET;
+		serv_addr.sin_port = htons(port);
+		if (inet_pton(AF_INET, ip, &serv_addr.sin_addr) <= 0) {
+			perror("inet_pton failed : ") ;
+			exit(EXIT_FAILURE) ;
+		}
 
-	// }
-	// printf("client> %s\n", data);
+		if (connect(sock_fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+			perror("connect failed : ") ;
+			exit(EXIT_FAILURE) ;
+		}
+		//물어볼 때 쓰는 질문을 만들어
+		data = id;
+		len = 8;
+		s = 0;
+		while (len > 0 && (s = send(sock_fd, data, len, 0)) > 0) {
+			data += s ;
+			len -= s ;
+		}
+		shutdown(sock_fd, SHUT_WR) ;
+
+		//아직이라고 하면 그냥 진행
+
+		char buf[1024] ;
+		data = 0x0 ;
+		len = 0 ;
+		while ( (s = recv(sock_fd, buf, 1023, 0)) > 0 ) {
+			buf[s] = 0x0 ;
+			if (data == 0x0) {
+				data = strdup(buf) ;
+				len = s ;
+			}
+			else {
+				data = realloc(data, len + s + 1) ;
+				strncpy(data + len, buf, s) ;
+				data[len + s] = 0x0 ;
+				len += s ;
+			}
+
+		}
+		printf("client> %s\n", data);
+		// 받았어! 그러면 show 하고 너는 죽어
+		
+		close(sock_fd);
+	}
+	
+	
 
 }
