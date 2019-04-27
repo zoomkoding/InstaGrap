@@ -1,2 +1,0 @@
-this text is written in uppercase.
-there isn't any lower case letter in the entire file.

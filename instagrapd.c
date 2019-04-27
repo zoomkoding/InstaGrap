@@ -20,93 +20,62 @@ int worker_fd;
 int listen_fd;
 
 void child_proc(int conn){
-	char buf[1024] ;
+	char buf[1024];
+	char line[1024];
+	char type[10];
+	char id[20];
+	char pw[20];
+	char code[1024];
 	char * data = 0x0, * orig = 0x0 ;
 	int len = 0 ;
 	int s ;
-  	int file_size;
-	FILE *received_file;
-	int remain_data = 0;
+	int req_type = 0;
 
-	/*Receive File from Client */
-	char* fr_name = "21500670.c";
-	char* student_id = "21500670";
-	FILE *fr = fopen(fr_name, "a");
-	if(fr == NULL)
-		printf("File %s Cannot be opened file on server.\n", fr_name);
-	else
-	{
-		bzero(buf, LENGTH);
-		int fr_block_sz = 0;
-		while((fr_block_sz = recv(conn, buf, LENGTH, 0)) > 0)
-		{
-			printf("%s", buf);
-		  	int write_sz = fwrite(buf, sizeof(char), fr_block_sz, fr);
-			if(write_sz < fr_block_sz)
-		    {
-		        error("File write failed on server.\n");
-		    }
-			bzero(buf, LENGTH);
-			if (fr_block_sz == 0 || fr_block_sz != 512)
-			{
-				break;
-			}
+	//submitter 제출 내용 받아오기
+	while ( (s = recv(conn, buf, 1023, 0)) > 0 ) {
+		buf[s] = 0x0 ;
+		if (data == 0x0) {
+			data = strdup(buf) ;
+			len = s ;
 		}
-		if(fr_block_sz < 0)
-	    {
-	        if (errno == EAGAIN)
-        	{
-                printf("recv() timed out.\n");
-            }
-            else
-            {
-                fprintf(stderr, "recv() failed due to errno = %d\n", errno);
-				exit(1);
-            }
-      	}
-		printf("Ok received from client!\n");
-		fclose(fr);
+		else {
+			data = realloc(data, len + s + 1) ;
+			strncpy(data + len, buf, s) ;
+			data[len + s] = 0x0 ;
+			len += s ;
+		}
 	}
+	// printf(">%s\n", data) ;
 
+	//request type 정해주기 1:send, 2:check
+	if(strncmp(data, "send", 4) == 0) req_type = 1;
+	if(strncmp(data, "check", 5) == 0) req_type = 2;
+	
+	//request type따라 진행
+	if(req_type == 1){
+		//파씽이 필요해
+		char *token = NULL;
+		int parse_count = 0;
+		
+		token = strtok( data, "@" );
+		
+		while( token != NULL )
+		{	
+			if(parse_count == 0)strcpy(type, token);
+			else if(parse_count == 1)strcpy(id, token);
+			else if(parse_count == 2)strcpy(pw, token);
+			else if(parse_count == 3)strcpy(code, token);
 
-	// pid_t child_pid = fork() ;
-	// if (child_pid == 0) {
-	// 	execl("/usr/bin/gcc", "gcc", "-o", student_id, fr_name, (char *) NULL);
-	// }
-	// else {
-	// 	wait(0);
-	// 	printf("instagrapd> exe file created\n");
-	// 	data = student_id;
-	// 	len = 8;
-	// 	s = 0;
-	// 	while (len > 0 && (s = send(worker_fd, data, len, 0)) > 0) {
-	// 		data += s ;
-	// 		len -= s ;
-	// 	}
-	// 	shutdown(worker_fd, SHUT_WR) ;
+			token = strtok( NULL, "@" );
+			parse_count++;
+		}
 
-	// }
+		printf("type_num : %d\ntype : %s\nid : %s\npw : %s\ncode :\n %s\n", req_type, type, id, pw, code);
+	}
+	else if(req_type == 2){
 
-
-	// char buf1[1024] ;
-	// data = 0x0 ;
-	// len = 0 ;
-	// while ( (s = recv(worker_fd, buf1, 1023, 0)) > 0 ) {
-	// 	buf1[s] = 0x0 ;
-	// 	if (data == 0x0) {
-	// 		data = strdup(buf1) ;
-	// 		len = s ;
-	// 	}
-	// 	else {
-	// 		data = realloc(data, len + s + 1) ;
-	// 		strncpy(data + len, buf1, s) ;
-	// 		data[len + s] = 0x0 ;
-	// 		len += s ;
-	// 	}
-
-	// }
-	printf("instagrapd> %s\n", data);
-
+	}
+	
 }
 
 int
