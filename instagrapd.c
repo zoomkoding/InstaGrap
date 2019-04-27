@@ -1,228 +1,158 @@
-// Partly taken from https://www.geeksforgeeks.org/socket-programming-cc/
-
-#include <unistd.h>
+#include <unistd.h> //getopt 등
 #include <stdio.h>
-#include <sys/socket.h>
+#include <sys/socket.h> //accept 등
 #include <stdlib.h>
 #include <netinet/in.h>
-#include <string.h>
-#include <errno.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
+#include <string.h> //strdup, strncpy 등
+#include <stdio.h> //getdelim
 
-#define LENGTH 512
-#define PORT_USER 8017
-#define PORT_WORKER 8018
+//submitter로부터 받는 과제물!
+typedef struct Assignment{
+  char *std_id;
+  char *std_pwd;
+  // FILE *f;이건 나중에
+}assignment;
 
-int worker_fd;
-int listen_fd;
+/**
+TODO
+1. sys/sendfile.h 에 있는 sendfile()이라는 함수에 대해 알아보고 적합하다고 판단되면 적용해서 코드짜기
 
-void child_proc(int conn){
-	char buf[1024] ;
-	char * data = 0x0, * orig = 0x0 ;
-	int len = 0 ;
-	int s ;
-  	int file_size;
-	FILE *received_file;
-	int remain_data = 0;
+**/
 
-	/*Receive File from Client */
-	char* fr_name = "21500670.c";
-	char* student_id = "21500670";
-	FILE *fr = fopen(fr_name, "a");
-	if(fr == NULL)
-		printf("File %s Cannot be opened file on server.\n", fr_name);
-	else
-	{
-		bzero(buf, LENGTH);
-		int fr_block_sz = 0;
-		while((fr_block_sz = recv(conn, buf, LENGTH, 0)) > 0)
-		{
-			printf("%s", buf);
-		  	int write_sz = fwrite(buf, sizeof(char), fr_block_sz, fr);
-			if(write_sz < fr_block_sz)
-		    {
-		        error("File write failed on server.\n");
-		    }
-			bzero(buf, LENGTH);
-			if (fr_block_sz == 0 || fr_block_sz != 512)
-			{
-				break;
-			}
+/*
+submitter와 통신하는 부분
+submitter로부터 받아야 하는 것들
+1. student id
+2. password
+3. file (이 부분은 submitter가 file을 어떤 형식으로 보내는가에 따라 달라질 것 같은데...생각을 해보자)
+
+일단 student_id와 password 받는 것부터!
+
+param : sumitter_sd (submitter의 socket descritper)
+*/
+void
+child_proc(int submitter_sd)
+{
+  assignment buf[1024];
+	char * std_id = 0x0, * std_pwd = 0x0 ;
+
+	// char * data = 0x0, * orig = 0x0 ;
+	int len_id = 0 ;
+  int len_pwd = 0 ;
+	int s_id ;
+  int s_pwd ;
+
+	while ( (s = recv(submitter_sd, buf, 1023 * sizeof(assignment), 0)) > 0 ) { //만약 socket이 assignment 라는 structure를 보낸다면...너무 큰 거 같기도 하고 이걸 어떻게 처리하지...
+		buf[s] = 0x0 ;
+		if (std_id == 0x0) {
+			std_id = strdup(buf) ;
+			len = s ;
 		}
-		if(fr_block_sz < 0)
-	    {
-	        if (errno == EAGAIN)
-        	{
-                printf("recv() timed out.\n");
-            }
-            else
-            {
-                fprintf(stderr, "recv() failed due to errno = %d\n", errno);
-				exit(1);
-            }
-      	}
-		printf("Ok received from client!\n");
-		fclose(fr);
+		else {
+			data = realloc(data, len + s + 1) ;
+			strncpy(data + len, buf, s) ;
+			data[len + s] = 0x0 ;
+			len += s ;
+		}
+
 	}
-
-
-	// pid_t child_pid = fork() ;
-	// if (child_pid == 0) {
-	// 	execl("/usr/bin/gcc", "gcc", "-o", student_id, fr_name, (char *) NULL);
+	// printf(">%s\n", data) ;
+  //
+	// orig = data ;
+	// while (len > 0 && (s = send(submitter_sd, data, len, 0)) > 0) {
+	// 	data += s ;
+	// 	len -= s ;
 	// }
-	// else {
-	// 	wait(0);
-	// 	printf("instagrapd> exe file created\n");
-	// 	data = student_id;
-	// 	len = 8;
-	// 	s = 0;
-	// 	while (len > 0 && (s = send(worker_fd, data, len, 0)) > 0) {
-	// 		data += s ;
-	// 		len -= s ;
-	// 	}
-	// 	shutdown(worker_fd, SHUT_WR) ;
+	shutdown(submitter_sd, SHUT_WR) ; //write를 shutdown한다?
 
-	// }
+	if (orig != 0x0)
+		free(orig) ;
+}
 
-
-	// char buf1[1024] ;
-	// data = 0x0 ;
-	// len = 0 ;
-	// while ( (s = recv(worker_fd, buf1, 1023, 0)) > 0 ) {
-	// 	buf1[s] = 0x0 ;
-	// 	if (data == 0x0) {
-	// 		data = strdup(buf1) ;
-	// 		len = s ;
-	// 	}
-	// 	else {
-	// 		data = realloc(data, len + s + 1) ;
-	// 		strncpy(data + len, buf1, s) ;
-	// 		data[len + s] = 0x0 ;
-	// 		len += s ;
-	// 	}
-
-	// }
-	printf("instagrapd> %s\n", data);
-
+void Usage(const char *pname)
+{
+    printf("\nUsage: %s [options]\n",pname);
+    printf("option: [p] | [w] \n");
+    printf("option 'p' and 'w' need Add parameter\n");
+    printf("ex) %s -p <Port> -w <IP>:<WPort> <Dir>\n", pname);
+		printf(
+					"\t<Port> : port for listening of instagrapd\n"
+					"\t<IP> IP address of worker\n"
+					"\t<WPort> port of worker\n"
+					"\t<Dir> a path to a testcase directory\n"
+				);
 }
 
 int
-main(int argc, char const *argv[])
+main(int argc, char **argv)
 {
-	int new_socket ;
-	struct sockaddr_in address;
-	int opt;
-	int opt_ok = 0;
-	int addrlen = sizeof(address);
-  	int port;
-	char ip_port[100];
-	char ip[20];
-	int wport;
-	char dir[20];
-	
-	while((opt = getopt(argc, argv, "p:w:")) != -1) 
-    {
-        switch(opt) 
-        { 
-            case 'p':
-                port = atoi(optarg);
-				printf("Port %d starts listening...\n", port);
-				opt_ok ++;
-                break; 
-            case 'u':
-			    memcpy(ip_port, optarg, 100);
-				char *token = NULL;
-				token = strtok( ip_port, ":" );
-				int i = 0;
-				while( token != NULL )
-				{
-					if(i == 0) memcpy(ip, token, 20);
-					else if(i == 1) wport = atoi(token);
-					token = strtok( NULL, ":" );
-					i++;
-				}
-				opt_ok ++;
-                break;
-        }
-    } 
+	int submitter_listen_fd, submitter_socket, listen_port ;
+	struct sockaddr_in submitter_address; //submitter와 통신할 주소를 저장하는 구조체
+	int submitter_addrlen = sizeof(submitter_address);
+	char buffer[1024] = {0}; //이게 굳이 필요한 이유는??
 
-	for (int index = optind; index < argc; index++) {
-		opt_ok ++;
-		memcpy(dir, argv[index], 30);
+	submitter_listen_fd = socket(AF_INET /*IPv4*/, SOCK_STREAM /*TCP*/, 0 /*IP*/) ;
+	if (submitter_listen_fd == 0)  {
+		perror("socket failed : ");
+		exit(EXIT_FAILURE);
 	}
 
-//	if (opt_ok != 3)
-//    { 
-//		printf("Please give a right command with an available port number.\n");
-//		printf("usage : ./instagrapd -p [port_num] -w <IP>:<WPort> <Dir>\n");
-//		return 0;
-//    } 
+	memset(&submitter_address, '0', sizeof(submitter_address));
 
-	listen_fd = socket(AF_INET /*IPv4*/, SOCK_STREAM /*TCP*/, 0 /*IP*/) ;
-        if (listen_fd == 0)  {
-                perror("socket failed : ");
-                exit(EXIT_FAILURE);
-        }
+	int opt; //option
+	/*
+	option을 받아서 처리하는 부분
+	*/
+	// while((opt = getopt(argc, argv, "p:w:")) != -1) { //일단 worker에 관련된 부분은 나중에 코딩하자
+	while((opt = getopt(argc, argv, "p:")) != -1) {
+		switch (opt) {
+			case 'p':
+			listen_port = (unsigned short int)(atoi(optarg)); //이 부분이 약간 걸린다...
+			printf("%hu \n", listen_port);
 
-        memset(&address, '0', sizeof(address));
-        address.sin_family = AF_INET;
-        address.sin_addr.s_addr = INADDR_ANY /* the localhost*/ ;
-        address.sin_port = htons(port);
-        if (bind(listen_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
-                perror("bind failed : ");
-                exit(EXIT_FAILURE);
-        }
+			break;
 
+			// case 'w':
+			// /*
+			// 이 부분은 worker와 관련한 부분이니 후에 코딩하자
+			// */
+			// printf("-w %s\n", optarg);
+			//strdup 사용하기!!
+			//param = strdup(optarg);
+			//free(param);
+			// break;
 
+			default:
+			Usage(argv[0]);
+			break;
+		}
+	}
 
-        while (1) {
-                if (listen(listen_fd, 16 /* the size of waiting queue*/) < 0) {
-                        perror("listen failed : ");
-                        exit(EXIT_FAILURE);
-                }
+	submitter_address.sin_family = AF_INET;
+	submitter_address.sin_addr.s_addr = INADDR_ANY /* 일단 the localhost 나중에 server 복구되면 peace server로 입력*/ ;
+	submitter_address.sin_port = htons(listen_port); //option p에서 설정한 port에서 listen
+	if (bind(submitter_listen_fd, (struct sockaddr *)&submitter_address, sizeof(submitter_address)) < 0) {
+		perror("bind failed : ");
+		exit(EXIT_FAILURE);
+	}
 
-                new_socket = accept(listen_fd, (struct sockaddr *) &address, (socklen_t*)&addrlen) ;
-                if (new_socket < 0) {
-                        perror("accept");
-                        exit(EXIT_FAILURE);
-                }
+	while (1) {
+		if (listen(submitter_listen_fd, 16 /*the size of waiting queue*/) < 0) {
+			perror("listen failed : ");
+			exit(EXIT_FAILURE);
+		}
 
-                if (fork() > 0) {
-                        child_proc(new_socket) ;
-                }
-                else {
-                        close(new_socket) ;
-                }
-        }
+		submitter_socket = accept(submitter_listen_fd, (struct sockaddr *) &submitter_address, (socklen_t*)&submitter_addrlen) ;
+		if (submitter_socket < 0) {
+			perror("accept failed : ");
+			exit(EXIT_FAILURE);
+		}
 
-	// worker_fd = socket(AF_INET /*IPv4*/, SOCK_STREAM /*TCP*/, 0 /*IP*/) ;
-	// if (worker_fd == 0)  {
-	// 	perror("socket failed : ");
-	// 	exit(EXIT_FAILURE);
-	// }
-
-	// memset(&address, '0', sizeof(address));
-	// address.sin_family = AF_INET;
-	// address.sin_addr.s_addr = INADDR_ANY /* the localhost*/ ;
-	// address.sin_port = htons(wport);
-	// if (bind(worker_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
-	// 	perror("bind failed : ");
-	// 	exit(EXIT_FAILURE);
-	// }
-
-	// if (connect(worker_fd, (struct sockaddr *) &address, sizeof(address)) < 0) {
-	// 	perror("connect failed : ") ;
-	// 	exit(EXIT_FAILURE) ;
-	// }
-
-
-	// worker_fd = socket(AF_INET, SOCK_STREAM, 0) ;
-	// if (worker_fd <= 0) {
-	// 	perror("socket failed : ") ;
-	// 	exit(EXIT_FAILURE) ;
-	// }
-
+		if (fork() > 0) {
+			child_proc(submitter_socket) ;
+		}
+		else {
+			close(submitter_socket) ;
+		}
+	}
 }
