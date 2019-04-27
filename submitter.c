@@ -10,6 +10,8 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <time.h>
+
 // #include <sys/sendfile.h>
 
 #define PORT_USER 8017
@@ -18,6 +20,11 @@
 
 void help(){
 	printf("no good\n");
+}
+
+void waitFor (unsigned int secs) {
+    unsigned int retTime = time(0) + secs;   // Get finishing time.
+    while (time(0) < retTime);               // Loop until it arrives.
 }
 
 int
@@ -132,28 +139,64 @@ main(int argc, char const *argv[])
 	    bzero(sdbuf, LENGTH);
 		bzero(buffer, LENGTH);
 	}
-
-	// while(1){
-	// 	send(sock_fd, "check", 4, 0);
-	// 	while ( (s = recv(sock_fd, buf, 1023, 0)) > 0 ) {
-	// 		buf[s] = 0x0 ;
-	// 		if (data == 0x0) {
-	// 			data = strdup(buf) ;
-	// 			len = s ;
-	// 		}
-	// 		else {
-	// 			data = realloc(data, len + s + 1) ;
-	// 			strncpy(data + len, buf, s) ;
-	// 			data[len + s] = 0x0 ;
-	// 			len += s ;
-	// 		}
-
-	// 	}
-	// }
-	shutdown(sock_fd, SHUT_WR) ;
-
+	close(sock_fd);
 	
 
-	
+	char request[100] = "check@";
+	strcat(request, id);
+	strcat(request, "@");
+	strcat(request, pw);
 
+	while(1){
+		sock_fd = socket(AF_INET, SOCK_STREAM, 0) ;
+		if (sock_fd <= 0) {
+			perror("socket failed : ") ;
+			exit(EXIT_FAILURE) ;
+		}
+
+		memset(&serv_addr, '0', sizeof(serv_addr));
+		serv_addr.sin_family = AF_INET;
+		serv_addr.sin_port = htons(port);
+		if (inet_pton(AF_INET, ip, &serv_addr.sin_addr) <= 0) {
+			perror("inet_pton failed : ") ;
+			exit(EXIT_FAILURE) ;
+		}
+
+		if (connect(sock_fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+			perror("connect failed : ") ;
+			exit(EXIT_FAILURE) ;
+		}
+		data = request ;
+		len = strlen(request) ;
+		s = 0 ;
+		while (len > 0 && (s = send(sock_fd, data, len, 0)) > 0) {
+			data += s ;
+			len -= s ;
+		}
+		shutdown(sock_fd, SHUT_WR) ;
+
+		char buf[1024] ;
+		data = 0x0 ;
+		len = 0 ;
+		while ( (s = recv(sock_fd, buf, 1023, 0)) > 0 ) {
+			buf[s] = 0x0 ;
+			if (data == 0x0) {
+				data = strdup(buf) ;
+				len = s ;
+			}
+			else {
+				data = realloc(data, len + s + 1) ;
+				strncpy(data + len, buf, s) ;
+				data[len + s] = 0x0 ;
+				len += s ;
+			}
+		}
+		close(sock_fd);
+		if(strncmp(data, "no", 2) != 0) {
+			printf("%s", data);
+			break;
+		}
+		printf("request result : %s\n", data);
+		waitFor(1);
+	}
 }
