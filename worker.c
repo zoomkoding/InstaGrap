@@ -7,10 +7,10 @@
 #include <netinet/in.h>
 #include <string.h>
 
-#define PORT_WORKER 8018
-
 void child_proc(int conn){
 	char buf[1024] ;
+	char input[200] ;
+	char code[1024] ;
 	char * data = 0x0, * orig = 0x0 ;
 	int len = 0 ;
 	int s ;
@@ -29,32 +29,59 @@ void child_proc(int conn){
 		}
 
 	}
-	printf("worker> student_id received: %s\n", data) ;
 
-	// orig = data ;
+	//파씽이 필요해
+	char *token = NULL;
+	int parse_count = 0;
+	
+	token = strtok( data, "@" );
 
-	shutdown(conn, SHUT_WR) ;
-	if (orig != 0x0)
-		free(orig) ;
-	pid_t child_pid ;
+	while( token != NULL )
+	{	
+		if(parse_count == 0)strcpy(input, token);
+		else if(parse_count == 1)strcpy(code, token);
+
+		
+		token = strtok( NULL, "@" );
+		parse_count++;
+	}
+	printf("input : %s\n", input, code) ;
+
+	FILE *fp = fopen("input.in", "w");
+	fputs(input, fp);
+	fclose(fp);
+
+	FILE *fp2 = fopen("test.c", "w");
+	fputs(code, fp2);
+	fclose(fp2);
+
+	// orig = data ;	
+	pid_t child_pid, child_pid1 ;
 	int exit_code ;
-	char *student_id = data;
 	child_pid = fork() ;
 	if (child_pid == 0) {
-		printf("worker> testcase test begins\n");
-		freopen("testcase/1.in", "r", stdin);
-		freopen("1.out", "w", stdout);
-		execl(student_id, 0);
+		printf("compile\n");
+		execl("/usr/bin/gcc", "gcc", "-o", "test", "test.c", (char *) NULL);
 	}
 	else {
 		wait(0);
-		printf("worker> testcase test ends\n");
-		len = 20;
-		char *message1 = "testcase test over.\n";
-		while (len > 0 && (s = send(conn, message1, len, 0)) > 0) {
-			data += s ;
-			len -= s ;
+		child_pid1 = fork();
+		if(child_pid1 == 0){
+			printf("test begins\n");
+			freopen("input.in", "r", stdin);
+			freopen("output.out", "w", stdout);
+			execl("test", 0);
 		}
+		else{
+			wait(child_pid1);
+			char output[1024];
+			FILE *fp = fopen("output.out", "r");
+			fgets(output, sizeof(output), fp); 
+			printf("The result : %s\n", output); 
+			send(conn, output, 1024, 0);
+			close(conn);
+		}
+		
 	}
 }
 
@@ -88,7 +115,7 @@ main(int argc, char const *argv[])
 	memset(&address, '0', sizeof(address));
 	address.sin_family = AF_INET;
 	address.sin_addr.s_addr = INADDR_ANY /* the localhost*/ ;
-	address.sin_port = htons(PORT_WORKER);
+	address.sin_port = htons(port_num);
 	if (bind(listen_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
 		perror("bind failed : ");
 		exit(EXIT_FAILURE);

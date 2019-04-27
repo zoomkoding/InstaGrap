@@ -18,8 +18,24 @@
 
 #define MAX 10
 
+int id_check(char* id, char* pw){
+	return 1;
+}
+
 int worker_fd;
 int listen_fd;
+
+char dir[40]= {0x0,};
+struct sockaddr_in address, address2;
+int opt;
+int opt_ok = 0;
+int addrlen = sizeof(address);
+int port;
+char ip[40] = {0x0,};
+int wport;
+char ip_port[100] = {0x0,};
+int data_ready = 0;
+
 
 void child_proc(int conn){
 	char buf[1024];
@@ -33,7 +49,7 @@ void child_proc(int conn){
 	int len = 0 ;
 	int s ;
 	int req_type = 0;
-	int data_ready = 0;
+	
 
 	//submitter 제출 내용 받아오기
 	while ( (s = recv(conn, buf, 1023, 0)) > 0 ) {
@@ -75,6 +91,91 @@ void child_proc(int conn){
 		}
 
 		printf("type_num : %d\ntype : %s\nid : %s\npw : %s\ncode :\n %s\n", req_type, type, id, pw, code);
+		
+		FILE *record = fopen(id, "w");
+
+		//worker한테 일거리 주기
+		for(int i = 1; i < 4; i ++){
+			struct sockaddr_in serv_addr; 
+
+			//worker랑 연결합시다 이제
+			worker_fd = socket(AF_INET, SOCK_STREAM, 0) ;
+			if (worker_fd <= 0) {
+				perror("socket failed : ") ;
+				exit(EXIT_FAILURE) ;
+			} 
+			printf("%d, wport\n", wport);
+			memset(&serv_addr, '0', sizeof(serv_addr)); 
+			serv_addr.sin_family = AF_INET; 
+			serv_addr.sin_port = htons(wport); 
+			if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
+				perror("inet_pton failed : ") ; 
+				exit(EXIT_FAILURE) ;
+			} 
+
+			if (connect(worker_fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+				perror("connect failed : ") ;
+				exit(EXIT_FAILURE) ;
+			}
+
+			char input[1024] = {0x0,};
+			char where_in[100] = {0x0,};
+			char where_out[100] = {0x0,};
+			char tosend[1024] = {0x0,};
+			char tocheck[1024] = {0x0,};
+			strcpy(where_in, dir);
+			strcat(where_in, "/");
+			char str[5];
+			sprintf(str, "%d", i);
+			strcat(where_in, str);
+			strcat(where_in, ".in");
+			strcpy(where_out, dir);
+			strcat(where_out, "/");
+			strcat(where_out, str);
+			strcat(where_out, ".out");
+			// printf("주소: %s\n", where_in);
+			FILE *fp;
+			fp = fopen(where_in, "r");
+			fgets(tosend, sizeof(tosend), fp); 
+			fclose(fp);
+			strcat(tosend, "@");
+			strcat(tosend, code);
+			// printf("워커한테 보내는 내용\n%s", tosend);
+			send(worker_fd, tosend, strlen(tosend), 0);
+			shutdown(worker_fd, SHUT_WR) ;
+
+			char buf[1024] ;
+			data = 0x0 ;
+			len = 0 ;
+			while ( (s = recv(worker_fd, buf, 1023, 0)) > 0 ) {
+				buf[s] = 0x0 ;
+				if (data == 0x0) {
+					data = strdup(buf) ;
+					len = s ;
+				}
+				else {
+					data = realloc(data, len + s + 1) ;
+					strncpy(data + len, buf, s) ;
+					data[len + s] = 0x0 ;
+					len += s ;
+				}
+			}
+			
+			printf("%d번째 Result %s\n", i, data);
+
+			FILE *fp2;
+			fp2 = fopen(where_out, "r");
+			fgets(tocheck, sizeof(tocheck), fp); 
+			fclose(fp2);
+
+			printf("결과값 : %s\n정답값 : %s\n", data, tocheck);
+			if(strcmp(data, tocheck) == 0) fprintf(record, "%d번째 테스트 케이스 : 정답입니다!\n", i);
+			else fprintf(record, "%d번째 테스트 케이스 : 틀렸습니다!\n", i);
+			close(worker_fd);
+			fflush(record);
+		}
+		data_ready = 1;
+		fclose(record);
 	}
 	else if(req_type == 2){
 		//파씽이 필요해
@@ -94,13 +195,15 @@ void child_proc(int conn){
 			parse_count++;
 		}
 
-
 		//데이터가 준비되면 파일에 써놨던 내용을 다 읽어서 보내줘
 		if(data_ready && id_check(id, pw)) {
-			
+			FILE *myrecord = fopen(id, "r");
+			char record[1024] = {0x0,};
+			fread(record, sizeof(record), 1, myrecord);
+			send(conn, record, 1024, 0);
 		}
 		else send(conn, "no", 10, 0);
-		shutdown(conn, SHUT_WR) ;
+		close(conn);
 		printf("type_num : %d\ntype : %s\nid : %s\npw : %s\n", req_type, type, id, pw);
 
 	}
@@ -111,15 +214,8 @@ int
 main(int argc, char const *argv[])
 {
 	int new_socket ;
-	struct sockaddr_in address;
-	int opt;
-	int opt_ok = 0;
-	int addrlen = sizeof(address);
-  	int port;
-	char ip_port[100];
-	char ip[20];
-	int wport;
-	char dir[20];
+
+	
 	
 	while((opt = getopt(argc, argv, "p:w:")) != -1) 
     {
@@ -130,13 +226,15 @@ main(int argc, char const *argv[])
 				printf("Port %d starts listening...\n", port);
 				opt_ok ++;
                 break; 
-            case 'u':
+            case 'w':
 			    memcpy(ip_port, optarg, 100);
+				// printf("ip_port : %s\n");
 				char *token = NULL;
 				token = strtok( ip_port, ":" );
 				int i = 0;
 				while( token != NULL )
-				{
+				{	
+					printf("token : %s", token);
 					if(i == 0) memcpy(ip, token, 20);
 					else if(i == 1) wport = atoi(token);
 					token = strtok( NULL, ":" );
@@ -147,10 +245,14 @@ main(int argc, char const *argv[])
         }
     } 
 
+
 	for (int index = optind; index < argc; index++) {
 		opt_ok ++;
 		memcpy(dir, argv[index], 30);
 	}
+
+	printf("port : %d, ip : %s, wp : %d, dir : %s\n", port, ip, wport, dir);
+
 
 //	if (opt_ok != 3)
 //    { 
@@ -195,32 +297,4 @@ main(int argc, char const *argv[])
 			close(new_socket) ;
 		}
 	}
-
-	// worker_fd = socket(AF_INET /*IPv4*/, SOCK_STREAM /*TCP*/, 0 /*IP*/) ;
-	// if (worker_fd == 0)  {
-	// 	perror("socket failed : ");
-	// 	exit(EXIT_FAILURE);
-	// }
-
-	// memset(&address, '0', sizeof(address));
-	// address.sin_family = AF_INET;
-	// address.sin_addr.s_addr = INADDR_ANY /* the localhost*/ ;
-	// address.sin_port = htons(wport);
-	// if (bind(worker_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
-	// 	perror("bind failed : ");
-	// 	exit(EXIT_FAILURE);
-	// }
-
-	// if (connect(worker_fd, (struct sockaddr *) &address, sizeof(address)) < 0) {
-	// 	perror("connect failed : ") ;
-	// 	exit(EXIT_FAILURE) ;
-	// }
-
-
-	// worker_fd = socket(AF_INET, SOCK_STREAM, 0) ;
-	// if (worker_fd <= 0) {
-	// 	perror("socket failed : ") ;
-	// 	exit(EXIT_FAILURE) ;
-	// }
-
 }

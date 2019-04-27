@@ -10,5 +10,8 @@ clean:
 	rm -f submitter
 	rm -f instagrapd
 	rm -f worker
-	rm -f 21500670*
+	rm -f input.in
+	rm -f output.out
+	rm -f test.c
+	rm -f test
 

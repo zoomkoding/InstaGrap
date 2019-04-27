@@ -196,7 +196,7 @@ main(int argc, char const *argv[])
 			printf("%s", data);
 			break;
 		}
-		printf("request result : %s\n", data);
+		printf("request result : %s\n", buf);
 		waitFor(1);
 	}
 }
