@@ -25,6 +25,10 @@ int id_check(char* id, char* pw){
 int worker_fd;
 int listen_fd;
 
+int id[100];
+char pw[100][20];
+int finished[100];
+
 char dir[40]= {0x0,};
 struct sockaddr_in address, address2;
 int opt;
@@ -36,6 +40,52 @@ int wport;
 char ip_port[100] = {0x0,};
 int data_ready = 0;
 
+
+void init_user_table(){
+	for(int i = 0; i < 100; i++) {
+		id[i] = 0;
+		finished[i] = 0;
+	}
+}
+
+int put_to_user_table(int student_id, char* password){
+	for(int i = 0; i < 100; i++){
+		if(id[i] == 0) {
+			id[i] = student_id;
+			strcpy(pw[i], password);
+			printf("%d번째에 저장\n", i);
+			return i;
+		}
+	}
+}
+
+//id랑 비밀번호 틀리면 -1, id랑 비밀번호 같은데 unfinished 0, finished 1
+int check_user_table(int student_id, char* password){
+	for(int i = 0; i < 100; i++){
+		if(id[i] == student_id){
+			//id랑 pw랑 같으면
+			if(strcmp(password, pw[i]) == 0) {
+				//결과값 확인
+				if(finished[i]){
+					printf("%d번째에 있는거 성공 확인\n", i);
+					//초기화해줌
+					id[i] = 0;
+					pw[i][0] = '\0';
+					finished[i] = 0;
+					return 1;
+				} 
+				else {
+					printf("%d번째에 있는거 작업중 확인\n", i);
+					return 0;
+				}
+			}
+			else {
+				printf("아이디 비번 틀렸어\n");
+				return -1;
+			}
+		}
+	}
+}
 
 void child_proc(int conn){
 	char buf[1024];
@@ -89,6 +139,8 @@ void child_proc(int conn){
 			token = strtok( NULL, "@" );
 			parse_count++;
 		}
+
+		int index = put_to_user_table(atoi(id), pw);
 
 		printf("type_num : %d\ntype : %s\nid : %s\npw : %s\ncode :\n %s\n", req_type, type, id, pw, code);
 		
@@ -174,7 +226,7 @@ void child_proc(int conn){
 			close(worker_fd);
 			fflush(record);
 		}
-		data_ready = 1;
+		finished[index] = 1;
 		fclose(record);
 	}
 	else if(req_type == 2){
@@ -195,14 +247,21 @@ void child_proc(int conn){
 			parse_count++;
 		}
 
+		int check_result = check_user_table(atoi(id), pw);
+
 		//데이터가 준비되면 파일에 써놨던 내용을 다 읽어서 보내줘
-		if(data_ready && id_check(id, pw)) {
+		if(check_result == 1) {
+
 			FILE *myrecord = fopen(id, "r");
-			char record[1024] = {0x0,};
+			char data_to_send[1024] = "@@@ 채점결과 @@@\n";
+			char record[1024];
 			fread(record, sizeof(record), 1, myrecord);
-			send(conn, record, 1024, 0);
+			strcat(data_to_send, record);
+			send(conn, data_to_send, 1024, 0);
+			remove(id);
 		}
-		else send(conn, "no", 10, 0);
+		else if(check_result == 0) send(conn, "확인중...\n", 20, 0);
+		else send(conn, "아이디 비밀번호 틀림\n", 20, 0);
 		close(conn);
 		printf("type_num : %d\ntype : %s\nid : %s\npw : %s\n", req_type, type, id, pw);
 
@@ -214,6 +273,8 @@ int
 main(int argc, char const *argv[])
 {
 	int new_socket ;
+
+	init_user_table();
 
 	
 	

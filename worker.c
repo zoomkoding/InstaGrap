@@ -7,6 +7,13 @@
 #include <netinet/in.h>
 #include <string.h>
 
+void remove_all_files(){
+	remove("output.out");
+	remove("input.in");
+	remove("test");
+	remove("test.c");
+}
+
 void child_proc(int conn){
 	char buf[1024] ;
 	char input[200] ;
@@ -79,6 +86,7 @@ void child_proc(int conn){
 			fgets(output, sizeof(output), fp); 
 			printf("The result : %s\n", output); 
 			send(conn, output, 1024, 0);
+			remove_all_files();
 			close(conn);
 		}
 		

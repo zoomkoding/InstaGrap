@@ -22,9 +22,9 @@ void help(){
 	printf("no good\n");
 }
 
-void waitFor (unsigned int secs) {
-    unsigned int retTime = time(0) + secs;   // Get finishing time.
-    while (time(0) < retTime);               // Loop until it arrives.
+void waitFor (int milsecs) {
+    int retTime = clock() + milsecs;   // Get finishing time.
+    while (clock() < retTime);               // Loop until it arrives.
 }
 
 int
@@ -192,11 +192,11 @@ main(int argc, char const *argv[])
 			}
 		}
 		close(sock_fd);
-		if(strncmp(data, "no", 2) != 0) {
+		if(strncmp(data, "@@@", 3) == 0) {
 			printf("%s", data);
 			break;
 		}
-		printf("request result : %s\n", buf);
-		waitFor(1);
+		// printf("%s\n", buf);
+		waitFor(100000);
 	}
 }
