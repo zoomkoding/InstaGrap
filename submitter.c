@@ -16,7 +16,7 @@
 
 #define PORT_USER 8017
 
-#define LENGTH 1024
+#define LENGTH 10000
 
 void help(){
 	printf("no good\n");
@@ -81,7 +81,7 @@ main(int argc, char const *argv[])
 		memcpy(filename, argv[index], 30);
 	}
 
-	printf("IP : %s, port : %d, id : %s, pw : %s filename : %s\n", ip, port, id, pw, filename);
+	// printf("IP : %s, port : %d, id : %s, pw : %s filename : %s\n", ip, port, id, pw, filename);
 
 	//알규먼트가 제대로 안왔으면 help 보여주고 종료
 	if (opt_ok != 4)
@@ -131,7 +131,7 @@ main(int argc, char const *argv[])
 		data = buffer ;
 		len = strlen(buffer) ;
 		s = 0 ;
-		printf("%s", buffer);
+		// printf("%s", buffer);
 		while (len > 0 && (s = send(sock_fd, data, len, 0)) > 0) {
 			data += s ;
 			len -= s ;
@@ -197,6 +197,6 @@ main(int argc, char const *argv[])
 			break;
 		}
 		// printf("%s\n", buf);
-		waitFor(100000);
+		waitFor(50000);
 	}
 }

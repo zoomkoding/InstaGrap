@@ -12,37 +12,54 @@ int time_check = 1; //3초 초과여부를 확인하는 변수
 void
 alarm_handler(int sig)
 {
-	printf("...takes more than 3s. Quit...\n");
-	time_check--;
+    FILE *fp = fopen("time_out.txt", "w");
+    fputs("TIME OUT", fp);
+    close(fp);
+    
+//    printf("...takes more than 3s. Quit...\n");
 }
 
 void
 execute_test()
 {
-  signal(SIGALRM, alarm_handler) ;
-  alarm(3);
-
-	execl("test", (char *) NULL) ;
-
-	while(1);
+    signal(SIGALRM, alarm_handler) ;
+    alarm(3);
+    
+    execl("test", (char *) NULL) ;
+    
+    while(1);
 }
+
+int cfileexists(const char * filename){ 
+    /* try to open file to read */
+    FILE *file;
+    if (file = fopen(filename, "r")){
+        fclose(file);
+        return 1;
+    }
+    return 0;
+}
+
 
 void remove_all_files(){
 	remove("output.out");
 	remove("input.in");
+	remove("error.out");
 	remove("test");
 	remove("test.c");
+	// remove("test.cpp");
 }
 
 void child_proc(int conn){
-	char buf[1024] ;
-	char input[200] ;
-	char code[1024] ;
+	printf("worker starts working!\n");
+	char buf[200000] ;
+	char input[4000000] ;
+	char code[100000] ;
 	char * data = 0x0, * orig = 0x0 ;
 	int len = 0 ;
 	int s ;
 
-	while ( (s = recv(conn, buf, 1023, 0)) > 0 ) {
+	while ( (s = recv(conn, buf, 200000, 0)) > 0 ) {
 		buf[s] = 0x0 ;
 		if (data == 0x0) {
 			data = strdup(buf) ;
@@ -60,70 +77,111 @@ void child_proc(int conn){
 	//파씽이 필요해
 	char *token = NULL;
 	int parse_count = 0;
-
+	
 	token = strtok( data, "@" );
 
 	while( token != NULL )
-	{
+	{	
 		if(parse_count == 0)strcpy(input, token);
 		else if(parse_count == 1)strcpy(code, token);
 
-
+		
 		token = strtok( NULL, "@" );
 		parse_count++;
 	}
-	printf("input : %s\n", input, code) ;
+	// printf("input : %s\n", input) ;
 
 	FILE *fp = fopen("input.in", "w");
 	fputs(input, fp);
 	fclose(fp);
 
 	FILE *fp2 = fopen("test.c", "w");
+	// FILE *fp2 = fopen("test.cpp", "w");
 	fputs(code, fp2);
 	fclose(fp2);
-
+	printf("compile : ");
 	// orig = data ;
 	pid_t child_pid, child_pid1 ;
 	int exit_code ;
 	child_pid = fork() ;
 	if (child_pid == 0) {
-		printf("compile\n");
 		execl("/usr/bin/gcc", "gcc", "-o", "test", "test.c", (char *) NULL);
+		// execl("/usr/bin/g++", "g++", "-o", "test", "test.cpp", (char *) NULL);
+		
 	}
 	else {
 		wait(0);
-		child_pid1 = fork();
-		if(child_pid1 == 0){
-			printf("test begins\n");
-			freopen("input.in", "r", stdin);
-			freopen("output.out", "w", stdout);
-
-			signal(SIGALRM, alarm_handler) ;
-		  alarm(3);
-
-		  if(fork()== 0){
-		    execute_test(); //자식 프로세스가 test를 실행한다.
-		  }else{
-		    wait(0);
-		  }
-
+		int buildcheck = cfileexists("./test");
+		// printf("build check : %d\n", buildcheck);
+		if(!buildcheck) {
+			printf("failed.\n");
+			send(conn, "build fail", 20, 0);
+			remove_all_files();
+			close(conn);
 		}
 		else{
-			wait(child_pid1);
+			printf("succeeded.\n");
+			child_pid1 = fork();
+			if(child_pid1 == 0){
+				printf("output : ");
+				freopen("input.in", "r", stdin);
+				freopen("output.out", "w", stdout);
+				freopen("error.out", "a+", stderr);
+                
+                signal(SIGALRM, alarm_handler) ;
+                alarm(3);
+                
+                if(fork() == 0){
+                    execute_test(); //자식 프로세스가 test를 실행한다.
+                }else{
+                    wait(0);
+                    
+                }
+                
+				exit(0);
+			}
+			else{
+				wait(child_pid1);
+                FILE *time_check_fp  = fopen("time_out.txt", "r");
+                char time_check_read[20];
+                
+                if(time_check_fp == NULL){
+                    time_check = 1;
+                }else{
+                    fgets(time_check_read, 20, time_check_fp);
+                    if(strncmp("TIME OUT", time_check_read, 9) == 0){
+                        time_check = 0;
+                    }
+                }
+                
+                if(time_check == 0){
+                    printf("TIME OUT\n");
+                    send(conn, "TIME OUT", 9, 0);
+                }else{
+                    char output[1024];
+                    FILE *fp = fopen("output.out", "r");
+                    fread(output, sizeof(output), 1, fp);
+                    if(output[0] == '\0') {
+                        char error[1024] = "error - ";
+                        char error_file[1000];
+                        FILE *fp3 = fopen("error.out", "r");
+                        fread(error_file, sizeof(error_file), 1, fp3);
+                        printf("%s\n", error_file);
+                        strcat(error, error_file);
+                        send(conn, error, 1024, 0);
+                    }
+                    else{
+                        printf("%s\nsend : ", output);
+                        
+                        send(conn, output, 1024, 0);
+                        printf("succeeded.\n");
+                    }
+                }
+				
+				remove_all_files();
+				close(conn);
+				printf("worker's work done:)\n\n");
 
-			if (time_check <= 0) {
-				printf("TIME OUT\n");
-				send(conn, "TIME OUT", 9, 0);
-				remove_all_files();
-				close(conn);
-			}else{
-				char output[1024];
-				FILE *fp = fopen("output.out", "r");
-				fgets(output, sizeof(output), fp);
-				printf("The result : %s\n", output);
-				send(conn, output, 1024, 0);
-				remove_all_files();
-				close(conn);
 			}
 		}
 	}
@@ -141,7 +199,7 @@ main(int argc, char const *argv[])
 
 	if(strcmp(argv[1], "-p") == 0){
 		port_num = atoi(argv[2]);
-		printf("Port %d starts listening...\n", port_num);
+		printf("Port %d starts listening...\n\n", port_num);
 	}
 
 	else {
