@@ -165,7 +165,7 @@ void child_proc(int conn){
 		FILE *record = fopen(id, "w");
 
 		//worker한테 일거리 주기
-		for(int i = 1; i < 4; i ++){
+		for(int i = 1; i < 11; i ++){
 			struct sockaddr_in serv_addr; 
 
 			//worker랑 연결합시다 이제
@@ -240,7 +240,12 @@ void child_proc(int conn){
 			else if(strncmp(data, "error", 5) == 0){
 				printf("[%s] result[%d] : %s\n", id, i, data);
 				fprintf(record, "%d번째 테스트 케이스 : %s\n", i, data);
-			}
+            }else if(strncmp(data, "TIME OUT", 9) == 0){
+                printf("[%s] result : time out\n", id);
+                fprintf(record, "실행시간이 3초를 초과해습니다.\n");
+                fflush(record);
+                break;
+            }
 			else{
 				char *tocheck;
 				int size;

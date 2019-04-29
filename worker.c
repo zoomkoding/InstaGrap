@@ -6,9 +6,32 @@
 #include <stdlib.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <signal.h>
 
+int time_check = 1; //3초 초과여부를 확인하는 변수
 
-int cfileexists(const char * filename){
+void
+alarm_handler(int sig)
+{
+    FILE *fp = fopen("time_out.txt", "w");
+    fputs("TIME OUT", fp);
+    close(fp);
+    
+//    printf("...takes more than 3s. Quit...\n");
+}
+
+void
+execute_test()
+{
+    signal(SIGALRM, alarm_handler) ;
+    alarm(3);
+    
+    execl("test", (char *) NULL) ;
+    
+    while(1);
+}
+
+int cfileexists(const char * filename){ 
     /* try to open file to read */
     FILE *file;
     if (file = fopen(filename, "r")){
@@ -25,6 +48,8 @@ void remove_all_files(){
 	remove("error.out");
 	remove("test");
 	remove("test.c");
+	remove("time_out.txt");
+
 	// remove("test.cpp");
 }
 
@@ -105,29 +130,57 @@ void child_proc(int conn){
 				freopen("input.in", "r", stdin);
 				freopen("output.out", "w", stdout);
 				freopen("error.out", "a+", stderr);
-				execl("test", 0, (char *) NULL);
+                
+                signal(SIGALRM, alarm_handler) ;
+                alarm(3);
+                
+                if(fork() == 0){
+                    execute_test(); //자식 프로세스가 test를 실행한다.
+                }else{
+                    wait(0);
+                    
+                }
+                
 				exit(0);
 			}
 			else{
 				wait(child_pid1);
-				char output[1024];
-				FILE *fp = fopen("output.out", "r");
-				fread(output, sizeof(output), 1, fp); 
-				if(output[0] == '\0') {
-					char error[1024] = "error - ";
-					char error_file[1000];
-					FILE *fp3 = fopen("error.out", "r");
-					fread(error_file, sizeof(error_file), 1, fp3); 
-					printf("%s\n", error_file);
-					strcat(error, error_file);
-					send(conn, error, 1024, 0);
-				}
-				else{
-					printf("%s\nsend : ", output); 
-					
-					send(conn, output, 1024, 0);
-					printf("succeeded.\n");
-				}
+                FILE *time_check_fp  = fopen("time_out.txt", "r");
+                char time_check_read[20];
+                
+                if(time_check_fp == NULL){
+                    time_check = 1;
+                }else{
+                    fgets(time_check_read, 20, time_check_fp);
+                    if(strncmp("TIME OUT", time_check_read, 9) == 0){
+                        time_check = 0;
+                    }
+                }
+                
+                if(time_check == 0){
+                    printf("TIME OUT\n");
+					remove_all_files();
+                    send(conn, "TIME OUT", 9, 0);
+                }else{
+                    char output[1024];
+                    FILE *fp = fopen("output.out", "r");
+                    fread(output, sizeof(output), 1, fp);
+                    if(output[0] == '\0') {
+                        char error[1024] = "error - ";
+                        char error_file[1000];
+                        FILE *fp3 = fopen("error.out", "r");
+                        fread(error_file, sizeof(error_file), 1, fp3);
+                        printf("%s\n", error_file);
+                        strcat(error, error_file);
+                        send(conn, error, 1024, 0);
+                    }
+                    else{
+                        printf("%s\nsend : ", output);
+                        
+                        send(conn, output, 1024, 0);
+                        printf("succeeded.\n");
+                    }
+                }
 				
 				remove_all_files();
 				close(conn);
@@ -135,8 +188,6 @@ void child_proc(int conn){
 
 			}
 		}
-		
-		
 	}
 }
 

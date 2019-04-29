@@ -197,6 +197,6 @@ main(int argc, char const *argv[])
 			break;
 		}
 		// printf("%s\n", buf);
-		waitFor(50000);
+		waitFor(500000);
 	}
 }
