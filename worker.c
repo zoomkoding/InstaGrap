@@ -7,22 +7,36 @@
 #include <netinet/in.h>
 #include <string.h>
 
+
+int cfileexists(const char * filename){
+    /* try to open file to read */
+    FILE *file;
+    if (file = fopen(filename, "r")){
+        fclose(file);
+        return 1;
+    }
+    return 0;
+}
+
+
 void remove_all_files(){
 	remove("output.out");
 	remove("input.in");
+	remove("error.out");
 	remove("test");
-	remove("test.c");
+	// remove("test.c");
+	remove("test.cpp");
 }
 
 void child_proc(int conn){
-	char buf[1024] ;
-	char input[200] ;
-	char code[1024] ;
+	char buf[200000] ;
+	char input[4000000] ;
+	char code[100000] ;
 	char * data = 0x0, * orig = 0x0 ;
 	int len = 0 ;
 	int s ;
 
-	while ( (s = recv(conn, buf, 1023, 0)) > 0 ) {
+	while ( (s = recv(conn, buf, 200000, 0)) > 0 ) {
 		buf[s] = 0x0 ;
 		if (data == 0x0) {
 			data = strdup(buf) ;
@@ -52,43 +66,70 @@ void child_proc(int conn){
 		token = strtok( NULL, "@" );
 		parse_count++;
 	}
-	printf("input : %s\n", input, code) ;
+	// printf("input : %s\n", input) ;
 
 	FILE *fp = fopen("input.in", "w");
 	fputs(input, fp);
 	fclose(fp);
 
-	FILE *fp2 = fopen("test.c", "w");
+	// FILE *fp2 = fopen("test.c", "w");
+	FILE *fp2 = fopen("test.cpp", "w");
 	fputs(code, fp2);
 	fclose(fp2);
 
-	// orig = data ;	
+	// orig = data ;
 	pid_t child_pid, child_pid1 ;
 	int exit_code ;
 	child_pid = fork() ;
 	if (child_pid == 0) {
 		printf("compile\n");
-		execl("/usr/bin/gcc", "gcc", "-o", "test", "test.c", (char *) NULL);
+		// execl("/usr/bin/gcc", "gcc", "-o", "test", "test.c", (char *) NULL);
+		execl("/usr/bin/g++", "g++", "-o", "test", "test.cpp", (char *) NULL);
+		
 	}
 	else {
 		wait(0);
-		child_pid1 = fork();
-		if(child_pid1 == 0){
-			printf("test begins\n");
-			freopen("input.in", "r", stdin);
-			freopen("output.out", "w", stdout);
-			execl("test", 0);
-		}
-		else{
-			wait(child_pid1);
-			char output[1024];
-			FILE *fp = fopen("output.out", "r");
-			fgets(output, sizeof(output), fp); 
-			printf("The result : %s\n", output); 
-			send(conn, output, 1024, 0);
+		int buildcheck = cfileexists("./test");
+		// printf("build check : %d\n", buildcheck);
+		if(!buildcheck) {
+			send(conn, "build fail", 20, 0);
 			remove_all_files();
 			close(conn);
 		}
+		else{
+			child_pid1 = fork();
+			if(child_pid1 == 0){
+				printf("test begins\n");
+				freopen("input.in", "r", stdin);
+				freopen("output.out", "w", stdout);
+				freopen("error.out", "a+", stderr);
+				execl("test", 0, (char *) NULL);
+				exit(0);
+			}
+			else{
+				wait(child_pid1);
+				char output[1024];
+				FILE *fp = fopen("output.out", "r");
+				fread(output, sizeof(output), 1, fp); 
+				if(output[0] == '\0') {
+					char error[1024] = "error - ";
+					char error_file[1000];
+					FILE *fp3 = fopen("error.out", "r");
+					fread(error_file, sizeof(error_file), 1, fp3); 
+					printf("The result : %s\n", error_file);
+					strcat(error, error_file);
+					send(conn, error, 1024, 0);
+				}
+				else{
+					printf("The result : %s\n", output); 
+					send(conn, output, 1024, 0);
+				}
+				
+				remove_all_files();
+				close(conn);
+			}
+		}
+		
 		
 	}
 }

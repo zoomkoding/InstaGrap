@@ -16,7 +16,7 @@
 
 #define PORT_USER 8017
 
-#define LENGTH 1024
+#define LENGTH 10000
 
 void help(){
 	printf("no good\n");
@@ -197,6 +197,6 @@ main(int argc, char const *argv[])
 			break;
 		}
 		// printf("%s\n", buf);
-		waitFor(100000);
+		waitFor(50000);
 	}
 }

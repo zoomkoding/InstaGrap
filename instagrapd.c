@@ -21,6 +21,23 @@
 int id_check(char* id, char* pw){
 	return 1;
 }
+int Eliminate(char *str)
+{	
+	int actual = 0; 
+    for (; *str != '\0'; str++)
+    {	
+		if(*str >= '!' && *str <= '~' ){
+			actual ++;
+		}
+		
+        else
+        {
+            strcpy(str, str + 1);
+            str--;	
+        }
+    }
+	return actual;
+}
 
 int worker_fd;
 int listen_fd;
@@ -53,7 +70,7 @@ int put_to_user_table(int student_id, char* password){
 		if(id[i] == 0) {
 			id[i] = student_id;
 			strcpy(pw[i], password);
-			printf("%d번째에 저장\n", i);
+			// printf("%d번째에 저장\n", i);
 			return i;
 		}
 	}
@@ -67,7 +84,7 @@ int check_user_table(int student_id, char* password){
 			if(strcmp(password, pw[i]) == 0) {
 				//결과값 확인
 				if(finished[i]){
-					printf("%d번째에 있는거 성공 확인\n", i);
+					// printf("%d번째에 있는거 성공 확인\n", i);
 					//초기화해줌
 					id[i] = 0;
 					pw[i][0] = '\0';
@@ -75,12 +92,12 @@ int check_user_table(int student_id, char* password){
 					return 1;
 				} 
 				else {
-					printf("%d번째에 있는거 작업중 확인\n", i);
+					// printf("%d번째에 있는거 작업중 확인\n", i);
 					return 0;
 				}
 			}
 			else {
-				printf("아이디 비번 틀렸어\n");
+				// printf("아이디 비번 틀렸어\n");
 				return -1;
 			}
 		}
@@ -88,12 +105,12 @@ int check_user_table(int student_id, char* password){
 }
 
 void child_proc(int conn){
-	char buf[1024];
+	char buf[100000];
 	char line[1024];
 	char type[10];
 	char id[20];
 	char pw[20];
-	char code[1024];
+	char code[100000];
 	char data_from_server[1024] = {0x0,};
 	char * data = 0x0, * orig = 0x0 ;
 	int len = 0 ;
@@ -102,7 +119,7 @@ void child_proc(int conn){
 	
 
 	//submitter 제출 내용 받아오기
-	while ( (s = recv(conn, buf, 1023, 0)) > 0 ) {
+	while ( (s = recv(conn, buf, 100000, 0)) > 0 ) {
 		buf[s] = 0x0 ;
 		if (data == 0x0) {
 			data = strdup(buf) ;
@@ -142,7 +159,7 @@ void child_proc(int conn){
 
 		int index = put_to_user_table(atoi(id), pw);
 
-		printf("type_num : %d\ntype : %s\nid : %s\npw : %s\ncode :\n %s\n", req_type, type, id, pw, code);
+		// printf("type_num : %d\ntype : %s\nid : %s\npw : %s\ncode :\n %s\n", req_type, type, id, pw, code);
 		
 		FILE *record = fopen(id, "w");
 
@@ -156,7 +173,7 @@ void child_proc(int conn){
 				perror("socket failed : ") ;
 				exit(EXIT_FAILURE) ;
 			} 
-			printf("%d, wport\n", wport);
+			// printf("%d, wport\n", wport);
 			memset(&serv_addr, '0', sizeof(serv_addr)); 
 			serv_addr.sin_family = AF_INET; 
 			serv_addr.sin_port = htons(wport); 
@@ -170,11 +187,10 @@ void child_proc(int conn){
 				exit(EXIT_FAILURE) ;
 			}
 
-			char input[1024] = {0x0,};
+			char input[4000000] = {0x0,};
 			char where_in[100] = {0x0,};
 			char where_out[100] = {0x0,};
-			char tosend[1024] = {0x0,};
-			char tocheck[1024] = {0x0,};
+			char tosend[4000000] = {0x0,};
 			strcpy(where_in, dir);
 			strcat(where_in, "/");
 			char str[5];
@@ -188,7 +204,7 @@ void child_proc(int conn){
 			// printf("주소: %s\n", where_in);
 			FILE *fp;
 			fp = fopen(where_in, "r");
-			fgets(tosend, sizeof(tosend), fp); 
+			fread(tosend, sizeof(tosend), 1, fp); 
 			fclose(fp);
 			strcat(tosend, "@");
 			strcat(tosend, code);
@@ -213,17 +229,52 @@ void child_proc(int conn){
 				}
 			}
 			
-			printf("%d번째 Result %s\n", i, data);
+			// printf("%d번째 Result %s\n", i, data);
+			if(strncmp("build fail", data, 10) == 0) {
+				printf("컴파일 실패입니다.\n");
+				fprintf(record, "컴파일 실패입니다.\n");
+				fflush(record);
+				break;
+			}
+			else if(strncmp(data, "error", 5) == 0){
+				printf("(에러)%d번쨰 결과값 : %s\n", i, data);
+				fprintf(record, "%d번째 테스트 케이스 : %s\n", i, data);
+				printf("%d번째 테스트 케이스 : %s\n", i, data);
+			}
+			else{
+				char *tocheck;
+				int size;
+				int count;
 
-			FILE *fp2;
-			fp2 = fopen(where_out, "r");
-			fgets(tocheck, sizeof(tocheck), fp); 
-			fclose(fp2);
+				FILE *fp2;
+				fp2 = fopen(where_out, "r");
 
-			printf("결과값 : %s\n정답값 : %s\n", data, tocheck);
-			if(strcmp(data, tocheck) == 0) fprintf(record, "%d번째 테스트 케이스 : 정답입니다!\n", i);
-			else fprintf(record, "%d번째 테스트 케이스 : 틀렸습니다!\n", i);
-			close(worker_fd);
+				fseek(fp, 0, SEEK_END);   
+				size = ftell(fp);          
+
+				tocheck = malloc(size + 1);   
+				memset(tocheck, 0, size + 1);  
+
+				fseek(fp, 0, SEEK_SET);    
+				count = fread(tocheck, size, 1, fp);  
+				fclose(fp2);
+				close(worker_fd);
+				// printf("초기 사이즈 : %d\n", size);
+				size = Eliminate(tocheck);
+				Eliminate(data);
+				printf("%d번쨰 결과값 : %s\n정답값 : %s \nsize : %d\n", i, data, tocheck, size);
+				
+				if(strncmp(data, tocheck, size) == 0) {
+					fprintf(record, "%d번째 테스트 케이스 : 정답입니다!\n", i);
+					// printf("%d번째 테스트 케이스 : 정답입니다!\n", i);
+				}
+				
+				else {
+					fprintf(record, "%d번째 테스트 케이스 : 틀렸습니다!\n", i);
+					// printf("%d번째 테스트 케이스 : 틀렸습니다!\n", i);
+				}
+			}
+			
 			fflush(record);
 		}
 		finished[index] = 1;
@@ -253,17 +304,17 @@ void child_proc(int conn){
 		if(check_result == 1) {
 
 			FILE *myrecord = fopen(id, "r");
-			char data_to_send[1024] = "@@@ 채점결과 @@@\n";
+			char data_to_send[2000] = "@@@ 채점결과 @@@\n";
 			char record[1024];
 			fread(record, sizeof(record), 1, myrecord);
 			strcat(data_to_send, record);
-			send(conn, data_to_send, 1024, 0);
+			send(conn, data_to_send, 2000, 0);
 			remove(id);
 		}
 		else if(check_result == 0) send(conn, "확인중...\n", 20, 0);
 		else send(conn, "아이디 비밀번호 틀림\n", 20, 0);
 		close(conn);
-		printf("type_num : %d\ntype : %s\nid : %s\npw : %s\n", req_type, type, id, pw);
+		// printf("type_num : %d\ntype : %s\nid : %s\npw : %s\n", req_type, type, id, pw);
 
 	}
 	
@@ -295,7 +346,7 @@ main(int argc, char const *argv[])
 				int i = 0;
 				while( token != NULL )
 				{	
-					printf("token : %s", token);
+					// printf("token : %s", token);
 					if(i == 0) memcpy(ip, token, 20);
 					else if(i == 1) wport = atoi(token);
 					token = strtok( NULL, ":" );
@@ -312,7 +363,7 @@ main(int argc, char const *argv[])
 		memcpy(dir, argv[index], 30);
 	}
 
-	printf("port : %d, ip : %s, wp : %d, dir : %s\n", port, ip, wport, dir);
+	// printf("port : %d, ip : %s, wp : %d, dir : %s\n", port, ip, wport, dir);
 
 
 //	if (opt_ok != 3)

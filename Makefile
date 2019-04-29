@@ -12,6 +12,7 @@ clean:
 	rm -f worker
 	rm -f input.in
 	rm -f output.out
+	rm -f error.out
 	rm -f test.c
 	rm -f test
 
