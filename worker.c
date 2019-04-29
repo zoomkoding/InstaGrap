@@ -24,11 +24,12 @@ void remove_all_files(){
 	remove("input.in");
 	remove("error.out");
 	remove("test");
-	// remove("test.c");
-	remove("test.cpp");
+	remove("test.c");
+	// remove("test.cpp");
 }
 
 void child_proc(int conn){
+	printf("worker starts working!\n");
 	char buf[200000] ;
 	char input[4000000] ;
 	char code[100000] ;
@@ -72,19 +73,18 @@ void child_proc(int conn){
 	fputs(input, fp);
 	fclose(fp);
 
-	// FILE *fp2 = fopen("test.c", "w");
-	FILE *fp2 = fopen("test.cpp", "w");
+	FILE *fp2 = fopen("test.c", "w");
+	// FILE *fp2 = fopen("test.cpp", "w");
 	fputs(code, fp2);
 	fclose(fp2);
-
+	printf("compile : ");
 	// orig = data ;
 	pid_t child_pid, child_pid1 ;
 	int exit_code ;
 	child_pid = fork() ;
 	if (child_pid == 0) {
-		printf("compile\n");
-		// execl("/usr/bin/gcc", "gcc", "-o", "test", "test.c", (char *) NULL);
-		execl("/usr/bin/g++", "g++", "-o", "test", "test.cpp", (char *) NULL);
+		execl("/usr/bin/gcc", "gcc", "-o", "test", "test.c", (char *) NULL);
+		// execl("/usr/bin/g++", "g++", "-o", "test", "test.cpp", (char *) NULL);
 		
 	}
 	else {
@@ -92,14 +92,16 @@ void child_proc(int conn){
 		int buildcheck = cfileexists("./test");
 		// printf("build check : %d\n", buildcheck);
 		if(!buildcheck) {
+			printf("failed.\n");
 			send(conn, "build fail", 20, 0);
 			remove_all_files();
 			close(conn);
 		}
 		else{
+			printf("succeeded.\n");
 			child_pid1 = fork();
 			if(child_pid1 == 0){
-				printf("test begins\n");
+				printf("output : ");
 				freopen("input.in", "r", stdin);
 				freopen("output.out", "w", stdout);
 				freopen("error.out", "a+", stderr);
@@ -116,17 +118,21 @@ void child_proc(int conn){
 					char error_file[1000];
 					FILE *fp3 = fopen("error.out", "r");
 					fread(error_file, sizeof(error_file), 1, fp3); 
-					printf("The result : %s\n", error_file);
+					printf("%s\n", error_file);
 					strcat(error, error_file);
 					send(conn, error, 1024, 0);
 				}
 				else{
-					printf("The result : %s\n", output); 
+					printf("%s\nsend : ", output); 
+					
 					send(conn, output, 1024, 0);
+					printf("succeeded.\n");
 				}
 				
 				remove_all_files();
 				close(conn);
+				printf("worker's work done:)\n\n");
+
 			}
 		}
 		
@@ -146,7 +152,7 @@ main(int argc, char const *argv[])
 
 	if(strcmp(argv[1], "-p") == 0){
 		port_num = atoi(argv[2]);
-		printf("Port %d starts listening...\n", port_num);
+		printf("Port %d starts listening...\n\n", port_num);
 	}
 
 	else {

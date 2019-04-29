@@ -160,7 +160,8 @@ void child_proc(int conn){
 		int index = put_to_user_table(atoi(id), pw);
 
 		// printf("type_num : %d\ntype : %s\nid : %s\npw : %s\ncode :\n %s\n", req_type, type, id, pw, code);
-		
+		printf("[%s] testing starts!\n\n", id);
+
 		FILE *record = fopen(id, "w");
 
 		//worker한테 일거리 주기
@@ -231,15 +232,14 @@ void child_proc(int conn){
 			
 			// printf("%d번째 Result %s\n", i, data);
 			if(strncmp("build fail", data, 10) == 0) {
-				printf("컴파일 실패입니다.\n");
+				printf("[%s] result : compile failed\n", id);
 				fprintf(record, "컴파일 실패입니다.\n");
 				fflush(record);
 				break;
 			}
 			else if(strncmp(data, "error", 5) == 0){
-				printf("(에러)%d번쨰 결과값 : %s\n", i, data);
+				printf("[%s] result[%d] : %s\n", id, i, data);
 				fprintf(record, "%d번째 테스트 케이스 : %s\n", i, data);
-				printf("%d번째 테스트 케이스 : %s\n", i, data);
 			}
 			else{
 				char *tocheck;
@@ -259,10 +259,11 @@ void child_proc(int conn){
 				count = fread(tocheck, size, 1, fp);  
 				fclose(fp2);
 				close(worker_fd);
+				printf("[%s] result[%d] : %s\n[%s] solution[%d] : %s\n", id, i, data, id, i, tocheck);
+
 				// printf("초기 사이즈 : %d\n", size);
 				size = Eliminate(tocheck);
 				Eliminate(data);
-				printf("%d번쨰 결과값 : %s\n정답값 : %s \nsize : %d\n", i, data, tocheck, size);
 				
 				if(strncmp(data, tocheck, size) == 0) {
 					fprintf(record, "%d번째 테스트 케이스 : 정답입니다!\n", i);
@@ -277,6 +278,7 @@ void child_proc(int conn){
 			
 			fflush(record);
 		}
+		printf("[%s] testing over!\n\n", id);
 		finished[index] = 1;
 		fclose(record);
 	}
@@ -335,7 +337,7 @@ main(int argc, char const *argv[])
         { 
             case 'p':
                 port = atoi(optarg);
-				printf("Port %d starts listening...\n", port);
+				printf("Port %d starts listening...\n\n", port);
 				opt_ok ++;
                 break; 
             case 'w':
